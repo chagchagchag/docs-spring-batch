@@ -1,0 +1,103 @@
+## 기본 구조
+
+참고 : https://docs.spring.io/spring-batch/docs/4.3.5/reference/html/job.html
+
+![](https://docs.spring.io/spring-batch/docs/4.3.5/reference/html/images/spring-batch-reference-model.png)
+
+<br/>
+
+
+
+## JobLauncher, JobRepository, Job, Chunk, Tasklet,  ItemReader, ItemProcessor, ItemWriter
+
+![](./img/2-architecture/2.1-infrastructure.png)
+
+
+
+<br/>
+
+
+
+### JobLauncher
+
+- Bean 을 생성만 했을 뿐인데 Batch가 실행됐다.
+- Spring Batch 는 Job 타임에 Bean 이 생성되면 JobLauncher 객체에 의해서 Job 을 수행한다.
+- JobLauncher 는 Job 을 실행하고, Job 은 Step 을 수행한다.
+
+
+
+### JobRepository
+
+- DB or Memory 에 스프링 배치가 실행될 수 있도록 배치의 메타데이터를 관리하는 역할을 수행
+
+
+
+### Job
+
+- **배치의 실행단위** (중요!!)
+
+- Job 은 JobLauncher 에 의해 실행되며
+- Job 은 여러 개의 Step 을 실행하며, Flow 를 관리할 수 있다.
+  - e.g. Step A → on 조건 B → Step B
+  - 이렇게 여러개의 Step 을 Flow 로 실행하는 것을 Job Flow 라고 부른다.
+
+
+
+### Chunk, Tasklet
+
+예를 들어 100만건의 데이터를 처리해야 하는 작업이 있다고 하자.<br/>
+
+만약 100만건의 데이터에 대해 원하는 작업을 할 때 컴퓨터 자원에 문제가 없다면? 
+
+- Tasklet 처리를 해도 된다.
+
+만약 100만건의 데이터에 대해 원하는 작업을 할 때 컴퓨터 자원에 문제가 있다면? 
+
+- Chunk 기반의 처리를 한다
+- 1만건 Size 의 Chunk 를 만들어서 이 Chunk 를 페이징 기반의 처리를 한다. 뒤에서 정리하겠지만, 가급적이면 페이징 사이즈는 Chunk Size 와 동일하게 하는 것이 권장된다.
+
+
+
+물론 Tasklet 도 나눠서 처리하는 것을 수동으로 작성할 수 있지만, Chunk 가 더 활용성이 높고 ItemReader, ItemProcessor, ItemWriter 등을 통해서 딱딱 떨어지게끔 처리하면서 중간에 어디까지 실행했는지에 대한 Context 를 저장하거나 이력을 보관할 수 있기에 가급적이면 Chunk 기반의 처리를 하도록 작성하는 것을 추천하는 편이다.
+
+
+
+### ItemReader, ItemProcessor, ItemWriter
+
+ItemReader
+
+- 배치 처리를 해야 하는 대상 객체를 읽어들이는 역할
+- e.g. `FlatFileItemReader`, `JdbcPagingItemReader`, `JpaPagingItemReader`
+
+ItemProcessor
+
+- ItemReader 로부터 읽어들인 데이터를 ItemWriter 로 보내기 전에 Processing 또는 Filtering 작업을 수행하는 역할
+- null 을 리턴하면 그 데이터는 필터링 되어 ItemWriter 로는 전달되지 않는다.
+- ItemProcessor 는 Optional 이며, 생략가능하다. 즉, Step 구성시 ItemReader, ItemWriter 로만 구성하는 것도 가능하다.
+
+ItemWriter
+
+- ItemProcessor 로부터 전달된 객체를 이용해서 데이터를 저장하거나, 메시지큐에 데이터를 전송하는 등과 같은 Write 하는 역할을 담당한다.
+
+<br/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
