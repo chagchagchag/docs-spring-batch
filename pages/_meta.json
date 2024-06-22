@@ -1,5 +1,7 @@
 {
   "index": "Introduction",
+  "1-setting-hellobatch": "Setting + Hello, Spring Batch",
+  "2-1-architecture": "Architecture",
   "contact": {
     "title": "Contact ↗",
     "type": "page",

@@ -1,2 +1,149 @@
 ## Spring Batch
 
+아래에서 정리하게 될 Spring Batch 에 대한 내용들은 교과서적인 내용들이고, 개인적인 교재도 있고, 블로그를 통해 공부한 교과서적인 내용들도 있는데, 이 내용들을 정리하는 데에 2시간 정도 소요될 것으로 보이고, 아마도 월요일 새벽에 작업을 하게 될 것 같음<br/>
+
+이번 문서에서 이런 교과서적인 내용 말고도 실제 스프링 배치를 운영에서 사용하면서 겪은 고충들을 적은 블로그 들이 있는데 그런 내용들을 정리하고, 트랜잭션이 청크단위로 실제로 롤백되는지 이런 예제들, 그리고 Step 을 이용한 여러가지 재미있는 예제들을 정리할 예정<br/>
+
+
+## Tasklet vs Chunk Based Processing
+
+Tasklet 기반 처리
+
+- 배치 처리 과정의 구조가 단순할 경우에 사용합니다.
+- 대용량 데이터 처리 시에 데이터를 여러 덩어리로 나눠서 처리하기에는 복잡한 구조입니다.
+- 대용량 데이터 처리를 할 경우 시스템의 자원이 부족하게 될 수 있다는 단점이 있습니다.
+
+
+
+Chunk 기반 처리
+
+- ItemReader, ItemProcessor, ItemWriter 를 이용해서 데이터르 처리합니다.
+- 대용량 데이터 처리 시에 데이터를 Chunk 단위로 나누고 이 Chunk 를 Paging 기반으로 여러 단계로 나누어 처리합니다.
+- 데용량 데이터 처리 시에 시스템의 자원이 부족해지는 현상 없이 안정적으로 처리할 수 있다는 장점이 있습니다. 
+- e.g. 10만개의 데이터를 10000 size 의 chunk 단위로 처리하는 경우
+
+
+
+
+
+## JobParameters
+
+배치 실행시 필요한 파라미터를 주입할 때 JobParameters 객체를 사용합니다.<br/>
+
+**파라미터 접근**<br/>
+
+파라미터 접근 시에는 아래의 두 방식으로 접근 가능합니다
+
+- JobParameters 를 이용한 파라미터 접근
+  - e.g. `String parameter = jobParameters.getString(key, defaultValue)`
+- Spring EL (Expression Language) 로 접근
+  - e.g. `@Value("#{jobParameters[key]}")`
+
+<br/>
+
+
+
+**파라미터 주입**<br/>
+
+파라미터를 주입하는 방식은 아래와 같습니다.
+
+- Intellij 에서 실행 또는 jar 파일 실행시 Program Argument 를 `-{파라미터명}` 으로 전달하는 방식
+- Controller 및 기타 엔드포인트에서 직접 인자를 전달하는 방식
+
+<br/>
+
+
+
+e.g.
+
+```java
+@Bean
+@JobScope
+public Step chunkBaseStep(@Value("#{jobParameters[orderId]}") String orderId){
+    String orderId = StringUtils.isNotEmpty(orderId) 
+        ? Long.parseLong(orderId)
+        : -1L;
+    
+    return stepBuilderFactory.get("somethingStep")
+        .<String,String>chunk(CHUNK_SIZE)
+        .reader(itemReader(orderId))
+        .processor(itemProcessor())
+        .writer(itemWriter())
+        .build();
+}
+```
+
+<br/>
+
+
+
+## ItemReader Interface
+
+- Template 으로 Job 파일 생성하는 것 등록하는 부분
+- AbstractItemStreamItemReader 는 ItemStream, ItemReader interface 를 implements 하고 있다는 점
+
+<br/>
+
+
+
+## CSV 파일 읽기
+
+회사간에 DB를 공유할 수 없기 때문에 csv 파일을 공유하는 경우가 잦았다고 함<br/>
+
+그래서 회사에서 csv 파일 기반으로 정산을 하는 경우가 많다고 함<br/>
+
+- lineMapper,
+
+- linesToSkip(1) : 1번째 라인은 스킵하겠다. (제목 필드)
+
+<br/>
+
+
+
+## JDBC 데이터 읽기
+
+Cursor 기반 조회
+
+Java 의 ResultSet 은 Cursor 를 구현한 클래스다. 기본적으로 쿼리를 실행하기 위해서 커넥션이 연결된 상태에서 커서의 위치를 한칸씩 이동하면서 데이터를 한칸씩 뽑아온다. JdbcCursorItemReader 는 Cursor 기반 ItemReader 다.
+
+- AbstractItemStreamItemReader 는 ItemStream 을 implements 하고 있는데,
+- ItemStream 의 close() 메서드가 호출되기 전 까지 Connection 이 계속 유지 된다.
+- 커넥션을 오래 연결하고 있기 때문에 커넥션을 연결하기 위한 리소스는 적게들지만, 반면에 커넥션 연결지속 시간이 길어진다는 단점이 있다.
+- 또한 하나의 커넥션으로 거의 모든 처리를 하기 때문에 Thread-Safe 하지 않다.
+- 모든 결과를 메모리에 할당하기 때문에 메모리를 많이 소모한다.
+
+
+
+Paging 기반 조회
+
+- 페이징 쿼리가 끝날 때마다 커넥션을 반복해서 연결
+- 커넥션을 유지하는 시간은 짧지만 반대로 커넥션 연결에 많은 리소스가 들어간다.
+
+
+
+JdbcCursorItemReader 는 sql() 메서드에 필요한 조회연산을 추가하고
+
+JdbcPagingItemReader 는 selectClause, fronClause, whereClause, queryProvider 를 사용한다.
+
+
+
+JdbcCursorItemREader
+
+
+
+
+
+## Jpa 데이터 읽기
+
+
+
+## ItemWriter interface 구조
+
+
+
+## skip 예외 처리
+
+skip 이 발생할 상황을 만들고 이것을 실행시킨 다음에 BATCH\_STEP\_EXECUTION, BATCH\_JOB\_EXECUTION 테이블에서 실패했는지 등을 조회해서 확인한다.
+
+SkipListener 는 항상 faultTolerant() 메서드 이후에 선언한다. 안그러면 동작을 안한다.
+
