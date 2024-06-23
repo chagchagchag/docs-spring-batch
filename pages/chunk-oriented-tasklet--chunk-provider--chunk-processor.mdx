@@ -59,9 +59,87 @@ ChunkOrientedTasklet 이 Chunk 처리 시에 예외 발생 시에 어떤식으�
 
 ## 2. ChunkOrientedTasklet 의 동작 방식
 
+![](./img/chunk-oriented-tasklet/chunk-oriented-tasklet-sequence.png)
+
+execute()
+
+- TaskletStep 은 execute() 메서드를 호출해서 ChunkOrientedTasklet 을 실행합니다.
+
+ChunkOrientedTasklet::provide()
+
+- ItemReader 를 통해서 Chunk에 저장할 item을 읽어옵니다.
+- 이때 Chunk 내에서 처음 불러오는 것이라면 트랜잭션을 열어줍니다.
+- 이 데이터는 ChunkSize 만큼의 데이터입니다.
+
+ChunkOrientedTasklet::process(inputs)
+
+- ItemReader가 읽어들인 InputChunk 를 ChunkProcessor::process() 메서드에 전달됩니다.
+
+ItemProcessor::process()
+
+- ChunkProcessor 에서부터 Input Chunk 는 ItemProcessor::process() 에서 단건으로 처리됩니다. 
+- ItemProcessor::process() 의 결과는 OutputChunk에 하나씩 들어갑니다.
+
+ItemWriter::write(items)
+
+- Output Chunk 가 ItemWriter 에 전달되며, 이 OutputChunk 는 ItemWriter 에서는 배치(덩어리)처리 됩니다.
+
+<br/>
+
+
+
 ## 3. ChunkOrientedTasklet 의 주요 API
 
+\<I,O\> chunk(int chunkSize)
+
+- chunkSize 설정
+- 다르게 이야기하면, commit 인터벌을 의미합니다. 
+- 스프링 배치의 ChunkOrientedTasklet 은 chunk 단위로 트랜잭션을 새로 열기 때문에 commit 인터벌 이라는 말로 설명할 수 있습니다.
+
+\<I,O\> chunk(CompletionPolicy)
+
+- Chunk Process 를 완료하기 위한 설정 클래스를 지정합니다.
+
+reader()
+
+- ItemReader 구현체를 지정하는 메서드 입니다.
+
+writer()
+
+- ItemWriter 구현체를 지정하는 메서드 입니다.
+
+processor()
+
+- ItemProcessor 구현체를 지정하는 메서드입니다.
+- Optional 하게 지정가능하며, ItemProcessor 가 필요없다면 지정해주지 않아도 됩니다.
+
+stream()
+
+- 재시작 데이터를 관리하는 콜백에 대한 stream 을 지정하는 메서드 입니다.
+
+readerIsTransactionalQueue()
+
+- Item 이 JMS 와 같은 트랜잭션 트랜잭션 외부에서 읽혀지고 캐시할 것인지를 지정하는 메서드입니다.
+
+listener
+
+- 리스너를 지정할 때 사용하는 메서드입니다.
+
+build
+
+- build 메서드를 통해 객체를 생성합니다.
+
+<br/>
+
+
+
 ## 4. ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식
+
+Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이터를 다시 읽지 않고 버퍼(=ChunkContext)에 담아둔 데이터를 가져옵니다.<br/>
+
+
+
+### 내부 동작
 
 
 
