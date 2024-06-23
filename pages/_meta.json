@@ -3,6 +3,8 @@
   "1-setting-hellobatch": "Setting + Hello, Spring Batch",
   "2.1-architecture": "Architecture",
   "chunk-oriented-tasklet--chunk-provider--chunk-processor": " ChunkOrientedTasklet, ChunkProvider, ChunkProcessor",
+  "etc": "기타 개념들",
+  "info": "자료모음",
   "contact": {
     "title": "Contact ↗",
     "type": "page",
