@@ -2,6 +2,7 @@
   "index": "Introduction",
   "1-setting-hellobatch": "Setting + Hello, Spring Batch",
   "2-1-architecture": "Architecture",
+  "chunk-oriented-tasklet--chunk-provider--chunk-processor": " ChunkOrientedTasklet, ChunkProvider, ChunkProcessor",
   "contact": {
     "title": "Contact ↗",
     "type": "page",

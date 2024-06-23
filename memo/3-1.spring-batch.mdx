@@ -54,7 +54,7 @@ Chunk 기반 처리
 
 
 
-e.g.
+e.g. 주입된 Job 파라미터를 Spring EL 을 이용해서 읽어들이는 예제입니다.
 
 ```java
 @Bean
@@ -88,9 +88,7 @@ public Step chunkBaseStep(@Value("#{jobParameters[orderId]}") String orderId){
 
 ## CSV 파일 읽기
 
-회사간에 DB를 공유할 수 없기 때문에 csv 파일을 공유하는 경우가 잦았다고 함<br/>
-
-그래서 회사에서 csv 파일 기반으로 정산을 하는 경우가 많다고 함<br/>
+회사 간에 DB를 공유할 수 없는 경우가 많기에 회사 간에 자료 교환 시 CSV 파일을 공유하는 경우도 현업에서 자주 있는 편이고, 정산 수행 시 CSV 파일을 기반으로 정산을 하는 경우가 흔하다고 합니다 .
 
 - lineMapper,
 
@@ -141,9 +139,35 @@ JdbcCursorItemREader
 
 
 
+## CSV 파일 데이터 쓰기
+
+## JDBC 데이터 쓰기
+
+## JPA 데이터 쓰기
+
+## ItemProcessor Iterface 구조
+
+
+
+### JobExecutionListener, StepExecutionListener
+
+
+
+## StepListener
+
+
+
 ## skip 예외 처리
 
 skip 이 발생할 상황을 만들고 이것을 실행시킨 다음에 BATCH\_STEP\_EXECUTION, BATCH\_JOB\_EXECUTION 테이블에서 실패했는지 등을 조회해서 확인한다.
 
 SkipListener 는 항상 faultTolerant() 메서드 이후에 선언한다. 안그러면 동작을 안한다.
+
+
+
+
+
+## retry 예외 처리
+
+
 
