@@ -147,9 +147,78 @@ Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이�
 
 
 
-### 내부 동작
+### 내부 동작 - ChunkOrientedTasklet::execute()
+
+```java
+public class ChunkOrientedTasklet<I> implements Tasklet {
+    // ...
+    
+    public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+        // (1)
+        Chunk<I> inputs = (Chunk)chunkContext.getAttribute("INPUTS");
+        
+        // (2)
+        if (inputs == null) { // (2.1) : 새로운 데이터일 경우 (캐시에 남아있는 데이터가 아닐때)
+          inputs = this.chunkProvider.provide(contribution); // (2.2)
+          if (this.buffering) { // (2.3) : buffering 이 null 이 아니라면 캐시에 작업할 chunk 를 보관
+            chunkContext.setAttribute("INPUTS", inputs);
+          }
+        }
+
+        // (3)
+        this.chunkProcessor.process(contribution, inputs);
+        this.chunkProvider.postProcess(contribution, inputs);
+        
+        if (inputs.isBusy()) {
+          logger.debug("Inputs still busy");
+          return RepeatStatus.CONTINUABLE;
+        } else {
+          // (4) 아무 문제 없이 현재 처리를 완료했다면, Chunk 처리 작업이 캐싱된 것을 제거
+          chunkContext.removeAttribute("INPUTS");
+          chunkContext.setComplete();
+          if (logger.isDebugEnabled()) {
+            logger.debug("Inputs not busy, ended: " + inputs.isEnd());
+          }
+
+          // (5) 읽을 Item 이 더 존재하는지 체크해서 그 상태를 RepeatStatus 로 return
+          return RepeatStatus.continueIf(!inputs.isEnd());
+        }
+	}
+}
+```
+
+<br/>
 
 
+
+(1) : `Chunk<I> inputs = (Chunk)chunkContext.getAttribute("INPUTS");`
+
+- ChunkContext 라는 것은 캐시같은 개념입니다. 
+- ChunkContext 에 이전에 실행했던 Chunk 가 남아있는지를 getAttribute("INPUTS") 를 통해 검사합니다.
+- getAttribute("INPUTS") 로 조회한 Chunk\<I\> 가 존재한다면, 예전에 실행하던 Chunk 가 남아있다는 의미입니다. 
+- Chunk 가 남아있다는 것은 작업에 실패했다거나 그런 이슈로 인해 ChunkContext 에 저장되어있다는 것을 의미합니다.
+
+(2)
+
+- (2.1) : `if (inputs == null)`
+  - 새로운 데이터일 경우 (캐시에 남아있는 데이터가 아닐때) 를 의미합니다.
+- (2.2) : `inputs = this.chunkProvider.provide(contribution);`
+  - ChunkProvider 의 provide(contribution) 메서드를 호출해서 현재 청크를 Process, Write 를 하는 단계로 넘어갑니다.
+- (2.3) `if (this.buffering) {...}` 
+  - buffering 이 null 이 아니라면 캐시에 작업할 Chunk 를 보관합니다.
+  - 이렇게 해서 저장한 작업인 Chunk 는 정상적으로 처리가 된다면 캐시(=ChunkContext)에서 삭제를 하는데, (4) 의 단계가 작업이 정상적으로 종료된 후 캐시(=ChunkContext)에서 삭제를 하는 단계입니다.
+
+(3) : `this.chunkProcessor.process(contribution, inputs);` 
+
+- InputChunk 를 OutputChunk 로 가공해줍니다.
+
+(4) : `chunkContext.removeAttribute("INPUTS");`
+
+- 아무 문제 없이 현재 처리를 완료했다면, Chunk 처리 작업이 캐싱된 것을 제거합니다.
+
+(5) : `return RepeatStatus.continueIf(!inputs.isEnd());` 
+
+- 읽을 Item 이 더 존재하는지 체크해서 그 상태를 RepeatStatus 로 return 합니다.
 
 <br/>
 
