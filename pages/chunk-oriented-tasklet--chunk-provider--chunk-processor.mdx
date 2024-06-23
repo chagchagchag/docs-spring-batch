@@ -53,9 +53,9 @@ ChunkOrientedTasklet 은 ChunkOrientedTasklet 이 실행될 때마다 새로운 
 
 ChunkOrientedTasklet 은 Chunk 단위로 트랜잭션을 커밋하기 때문에 이렇게 Chunk 단위 내에서 예외가 발생하면 그 Chunk 에서 처리하던 Transaction 은 Rollback 을 하게 됩니다.<br/>
 
-Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이터를 다시 읽지 않고 버퍼(=ChunkContext)에 담아둔 데이터를 가져옵니다. 이 재시도를 할 때 내부적으로 어떻게 하는지, 데이터를 새로 읽어오는지 에 대해서는 아래의 [4. ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식](/docs-spring-batch/chunk-oriented-tasklet--chunk-provider--chunk-processor/#chunkorientedtasklet-%EC%9D%98-chunk-%EC%B2%98%EB%A6%AC%EC%8B%9C-%EC%98%88%EC%99%B8-%EB%B0%9C%EC%83%9D%EC%9C%BC%EB%A1%9C-%EC%9D%B8%ED%95%9C-%EC%9E%AC%EC%8B%9C%EB%8F%84-%EB%B0%A9%EC%8B%9D) 섹션에서 정리합니다.<br/>
+Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이터를 다시 읽지 않고 버퍼(=ChunkContext)에 담아둔 데이터를 가져옵니다. 이 재시도를 할 때 내부적으로 어떻게 하는지, 데이터를 새로 읽어오는지 에 대해서는 아래의 [4. 재시도 방식 : ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식](/docs-spring-batch/chunk-oriented-tasklet--chunk-provider--chunk-processor/#chunkorientedtasklet-%EC%9D%98-chunk-%EC%B2%98%EB%A6%AC%EC%8B%9C-%EC%98%88%EC%99%B8-%EB%B0%9C%EC%83%9D%EC%9C%BC%EB%A1%9C-%EC%9D%B8%ED%95%9C-%EC%9E%AC%EC%8B%9C%EB%8F%84-%EB%B0%A9%EC%8B%9D) 섹션에서 정리합니다.<br/>
 
-> [4. ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식](/docs-spring-batch/chunk-oriented-tasklet--chunk-provider--chunk-processor/#chunkorientedtasklet-%EC%9D%98-chunk-%EC%B2%98%EB%A6%AC%EC%8B%9C-%EC%98%88%EC%99%B8-%EB%B0%9C%EC%83%9D%EC%9C%BC%EB%A1%9C-%EC%9D%B8%ED%95%9C-%EC%9E%AC%EC%8B%9C%EB%8F%84-%EB%B0%A9%EC%8B%9D)<br/>
+> [4. 재시도 방식 : ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식](/docs-spring-batch/chunk-oriented-tasklet--chunk-provider--chunk-processor/#chunkorientedtasklet-%EC%9D%98-chunk-%EC%B2%98%EB%A6%AC%EC%8B%9C-%EC%98%88%EC%99%B8-%EB%B0%9C%EC%83%9D%EC%9C%BC%EB%A1%9C-%EC%9D%B8%ED%95%9C-%EC%9E%AC%EC%8B%9C%EB%8F%84-%EB%B0%A9%EC%8B%9D)<br/>
 >
 > - 실패 후 재시도시 데이터를 새로 읽어올 경우 기존 데이터와 다를 수 있기에 내부적으로 ChunkContext 라고 불리는 버퍼를 사용하는데, 이 버퍼에 데이터를 어떻게 저장하는지 등과 관련된 내용을 다룹니다.
 
@@ -141,7 +141,7 @@ build
 
 
 
-## 4. ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식
+## 4. 재시도 방식 : ChunkOrientedTasklet 의 Chunk 처리시 예외 발생으로 인한 재시도 방식
 
 Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이터를 다시 읽지 않고 버퍼(=ChunkContext)에 담아둔 데이터를 가져옵니다.<br/>
 
@@ -151,27 +151,117 @@ Chunk 처리 중 예외가 발생해서 재시도를 해야 할 경우, 데이�
 
 
 
+<br/>
+
 
 
 ## ChunkProvider::provide()
 
-ChunkProvider::provide()
+![](./img/chunk-oriented-tasklet/chunk-oriented-tasklet-sequence-1.png)
 
-Iterator 패턴 기반인 RepeatOperations 를 기반으로 iterate 를 수행. 내부적으로는 doInIteration 클래스를 구현.
-
-Chunk 는 provide() 메서드가 호출될 때마다 새롭게 생성
-
-ItemReader 의 read(Contributuion, inputs) 를 통해 소스로부터 item 을 읽어온다.
-
-읽어온 item 이 없을 경우에는 종료하는데 inputs.setEnd() 를 호출해서 종료
-
-읽어온 item 이 있는 경우 input Chunk 인 inputs 에 넣어준다. (inputs.add(item) )
+<br/>
 
 
+
+ChunkProvider interface 는 provide(), postProcess() 메서드를 제공합니다.
+
+```java
+package org.springframework.batch.core.step.item;
+
+import org.springframework.batch.core.StepContribution;
+
+public interface ChunkProvider<T> {
+  Chunk<T> provide(StepContribution var1) throws Exception;
+
+  void postProcess(StepContribution var1, Chunk<T> var2);
+}
+```
+
+이 ChunkProvider interface 를 구현하는 구현체들은 다음과 같습니다.
+
+- FaultTolerantChunkProvider
+- JsrChunkProvider
+- **SimpleChunkProvider**
+
+<br/>
+
+
+
+이번 문서에서는 위의 구현체 들 중 SimpleChunkProvider 클래스의 provide() 메서드의 동작을 살펴봅니다.
+
+<br/>
+
+### SimpleChunkProvider::provide()
+
+```java
+public class SimpleChunkProvider<I> implements ChunkProvider<I> {
+    public Chunk<I> provide(final StepContribution contribution) throws Exception {
+        // (1) 
+        final Chunk<I> inputs = new Chunk();
+        
+        // (2) repeatOperations.iterate(new RepeatCallback(){...})
+        this.repeatOperations.iterate(new RepeatCallback() {
+          public RepeatStatus doInIteration(RepeatContext context) throws Exception {
+            I item = null;
+            Timer.Sample sample = Timer.start(Metrics.globalRegistry);
+            String status = "SUCCESS";
+
+            label45: {
+              RepeatStatus var6;
+              try {
+                // (3) 
+                item = SimpleChunkProvider.this.read(contribution, inputs);
+                break label45;
+              } catch (SkipOverflowException var10) {
+                status = "FAILURE";
+                var6 = RepeatStatus.FINISHED;
+              } finally {
+                SimpleChunkProvider.this.stopTimer(sample, contribution.getStepExecution(), status);
+              }
+
+              return var6;
+            }
+
+            if (item == null) {
+              // (4)
+              inputs.setEnd();
+              return RepeatStatus.FINISHED;
+            } else {
+              // (5) 
+              inputs.add(item);
+              contribution.incrementReadCount();
+              return RepeatStatus.CONTINUABLE;
+            }
+          }
+        });
+        
+        return inputs;
+	}
+}
+```
+
+
+
+- (1) : Chunk 객체를 새로 생성합니다. ChunkProvider 는 provide() 메서드가 호출될 때마다 새로운 Chunk 객체를 생성합니다.
+- (2) 
+  - Iterator 패턴 기반인 RepeatOperations 를 기반으로 iterate 를 수행합니다.
+  - 내부적으로는 doInIteration 클래스를 구현하고 있습니다.
+- (3) 
+  - SimpleChunkProvider 내의 read(Contributuion, inputs) 를 통해 소스로부터 item 을 읽어옵니다.
+- (4) 
+  - 읽어온 item 이 없을 경우에는 종료하는데 inputs.setEnd() 를 호출해서 종료합니다.
+- (5)
+  - 읽어온 item 이 있는 경우 Input Chunk 인 inputs 에 넣어줍니다. (inputs.add(item) )
+
+<br/>
 
 
 
 ## ChunkProcessor
+
+![](./img/chunk-oriented-tasklet/chunk-oriented-tasklet-sequence-2.png)
+
+<br/>
 
 ChunkProcessor interface 는 process() 메서드를 제공합니다.
 
@@ -190,7 +280,7 @@ public interface ChunkProcessor<I> {
 - FaultTolerantChunkProcessor
 - JsrChunkProcessor
 - JsrFaultTolerantChunkProcessor
-- SimpleChunkProcessor
+- **SimpleChunkProcessor**
 
 <br/>
 
