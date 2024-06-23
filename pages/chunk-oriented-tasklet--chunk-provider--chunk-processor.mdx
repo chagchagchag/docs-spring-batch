@@ -5,12 +5,7 @@
 ## 참고자료
 
 - [Spring Batch : ChunkOrientedTaskLet, ChunkProvider, ChunkProcessor](https://ojt90902.tistory.com/777)
-
-> Spring Batch 에서의 Transaction 에 대한 자료들을 찾아보던 중 위의 글을 발견해서 정리를 합니다.<br/>
->
-> 위의 자료는 인프런 정수원님의 강의를 듣고 정리한 블로그 문서라고 합니다.<br/>
->
-> 저 역시 위의 강의를 들어보고 싶지만, 이번달 생활비가 예산 초과여서 이번 달에는 결제를 못할 것 같고 다음달에 꼭 들어볼 생각으로 장바구니에만 추가해뒀습니다. 강의 목차를 보니 꽤 충실한 내용같아서 얼른 구매해서 강의를 들어보고 싶다는 생각을 하게 되네요!!
+- [스프링 배치 - 트랜잭션 관리를 청크 기반으로 하는 이유](https://devboi.tistory.com/350)
 
 <br/>
 
@@ -497,3 +492,37 @@ public class SimpleChunkProcessor<I, O> implements ChunkProcessor<I>, Initializi
 - (2)
   - doWrite(...) 메서드에서는 writeItems(items) 메서드에 items 전체를 넘겨줍니다.
   - 이로 미루어볼수 있는 것은 ItemWriter 는 데이터를 배치단위(덩어리)로 한번에 처리한 다는 사실을 알수 있습니다.
+
+<br/>
+
+
+
+## Spring Batch 가 트랜잭션 관리를 청크 기반으로 하는 이유
+
+> 참고 : 
+>
+> - [스프링 배치 - 트랜잭션 관리를 청크 기반으로 하는 이유](https://devboi.tistory.com/350)
+> - [스프링 배치를 사용하면서 겪은 것들](https://jiwondev.tistory.com/295)
+
+
+
+제 생각은 이렇습니다. 스프링의 Transactional AOP를 스프링 배치에 적용할 수 없었기 때문이었을 것입니다. Chunk 단위로 커밋을 해야 하는데, 이 트랜잭션 프록시라는게 클래스나 메서드 레벨에 적용이 가능하지 Chunk 에 적용하기는 구조상으로 쉽지 않았기에 스프링 배치 내에서 자체적으로 AOP 트랜잭션을 Chunk 기반으로 동작하도록 내부를 구현해둔게 아닐까 싶습니다.<br/>
+
+배치는 대용량 데이터를 다루는데, 대용량 데이터를 다룰때 컴퓨팅 자원이 부족해질 수 있습니다. 너무 큰 데이터를 한번에 로드해서 메모리가 부족해지는 현상을 겪을 수 있습니다. 따라서 데이터를 Chunk 단위로 읽어서 트랜잭션 동작을 수행하게 끔 하는 방식으로 내부 메커니즘이 구현되어 있습니다.<br/>
+
+이렇게 하면, 커밋이 Fetch Size 만큼 이뤄집니다. Chunk 단위로 커밋이 이뤄지며, 이 Chunk 의 크기는 Fetch Size 를 의미합니다.<br/>
+
+흔히 인터넷에서는 commit Interval 단위로 트랜잭션이 처리된다는 말을 자주 씁니다. 제 경우에는 commit interval 이라는 용어를 쓰는게 너무 용어 같아서 좋아하는 표현은 아닙니다.<br/>
+
+<br/>
+
+
+
+이렇게 Chunk 단위로 커밋을 수행하면  ItemReader, ItemProcessor, ItemWriter 를 사용가능해지는데, Tasklet 기반의 처리방식과 비교했을 때 장점은 아래와 같습니다.
+
+- skip, retry, no-rollback 정책기반의 동작 수행이 가능해지고
+- ItemReader 를 이용해서 조금 더 유연한 처리를 할 수 있습니다. (tasklet 기반 처리에서는 지원되지 않는 부분)
+- multi thread 를 위한 기능 역시 사용할 수 있습니다.
+
+즉, 청크 기반 방식의 ItemReader,Processor,Writer 를 사용하는 방식에서 재시도,롤백, skip 을 세부적으로 지정할 수 있기에 청크 기반 처리를 수행하며, 복잡한 배치 작업에서 일반적인 스프링에서의 트랜잭션 후처리 방식인  TransactionCallback 방식을 사용할 경우 데드락에 걸리는 이슈가 있기 때문에 청크 단위로 트랜잭션을 잡은 것입니다.
+
