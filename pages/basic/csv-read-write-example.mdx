@@ -67,7 +67,7 @@ public class CsvFileSampleJobConfig {
 
         // FlatMapItemReader 정의
         FlatFileItemReader<MemberEntity> itemReader = new FlatFileItemReaderBuilder<MemberEntity>()
-            .name("CSV_FILE_ITEM_READER") // READER NAME 지정
+            .name("CSV_FILE_IO_SAMPLE_JOB"+"__csvFileItemReader") // READER NAME 지정
             .encoding("UTF-8") // encoding 방식 지정
             .resource(new ClassPathResource("member-test-input.csv")) // Classpath 내의 test.csv 파일
             .linesToSkip(1) // 첫 1줄은 skip (제목)
@@ -78,6 +78,37 @@ public class CsvFileSampleJobConfig {
 
         return itemReader;
 	}
+}
+```
+
+<br/>
+
+
+
+### FlatFileItemReader
+
+FlatFileItemReader 의 주요 속성들은 아래와 같습니다.
+
+```java
+@Bean
+public FlatFileItemReader itemReader(){
+    return new FlatFileItemReaderBuilder<T>()
+        .name(String name) // ExecutionContext 내에서 구분하기 위한 이름 (ExecutionContext 내에서 key 로 구분됨)
+        .resource(Resource) // 읽어야 할 리소스 설정
+        .delimited().delimiter("|") // 파일의 구분자(delimiter)를 기준으로 파일을 읽어들인다.
+        .fixedLength() // 파일의 고정 길이를 기준으로 파일을 읽어들이도록 지정
+        .addColumns(Range...) // 고정 길이 범위를 지정
+        .names(String [] fieldNames) // LineTokenizer 로 구분된 라인의 항목을 객체의 필드명과 매핑
+        .targetType(Class class) // 라인의 각 항목과 매핑할 객체 타입 지정
+        .addComment(String comment) // 무시할 라인의 Comment 기호 지정
+        .strict(boolean) // 라인을 읽거나 토크나이징 할때 Parsing 예외가 발생하지 않도록 검증 생략하도록 설정
+        .encoding(String encoding) // File 인코딩
+        .linesToSkip(int linesToSkip) // 읽어들일 때 첫 줄로부터 무시할 라인수 지정
+        .saveState(boolean) // 상태 정보를 저장할 것인지 설정
+        .setLineMapper(LineMapper) // LineMapper 객체 설정 
+        .setFieldSetMapper(FieldSetMapper) // FieldSetMapper 객체 설정
+        .setLineTokenizer(LineTokenizer) // LineTokenizer 객체 설정
+        .build();
 }
 ```
 
@@ -110,9 +141,9 @@ public class CsvFileSampleJobConfig {
 
         // FlatFileItemWriter 객체를 FlatFileItemWriterBuilder 를 통해 생성
         FlatFileItemWriter<MemberEntity> csvFileItemWriter = new FlatFileItemWriterBuilder<MemberEntity>()
-            .name("CSV_FILE_ITEM_WRITER")
-            .encoding("UTF-8")
-            .resource(new ClassPathResource("member-test-output.csv"))
+            .name("CSV_FILE_ITEM_WRITER") // ExecutionContext 내에서 구분하기 위한 이름 (ExecutionContext 내에서 key 로 구분됨)
+            .encoding("UTF-8") // Encoding 설정
+            .resource(new FileSystemResource("output/member-test-output.csv"))
             .lineAggregator(lineAggregator)
             .headerCallback(writer -> writer.write("id, 이름, 이메일"))
             .footerCallback(writer -> writer.write("-------"))
@@ -131,7 +162,78 @@ public class CsvFileSampleJobConfig {
 
 
 
+### FlatFileItemWriter
+
+```java
+@Slf4j
+@Configuration
+@RequiredArgsConstructor
+public class CsvFileReadWriteJobConfig {
+    
+    // ...
+    
+    private FlatFileItemWriter<MemberEntity> csvFileItemWriter() throws Exception {
+        // fieldExtractor
+        // MemberEntity 에 대응되는 POJO 타입에 대응되도록 필드명을 매핑하는 Extractor
+        BeanWrapperFieldExtractor<MemberEntity> fieldExtractor = new BeanWrapperFieldExtractor<>();
+        fieldExtractor.setNames(new String[]{"id", "name", "email"});
+
+        // lineAggregator
+        // delimiter 를 지정해주고, {"id", "name", "email"} 에 대한 fieldExtractor 를 주입 받아서
+        // 원하는 필드에 대한 값들을 띄어내는 Aggregator 객체 생성
+        DelimitedLineAggregator<MemberEntity> lineAggregator = new DelimitedLineAggregator<>();
+        lineAggregator.setDelimiter(",");
+        lineAggregator.setFieldExtractor(fieldExtractor);
+
+        // FlatFileItemWriter 객체를 FlatFileItemWriterBuilder 를 통해 생성
+        FlatFileItemWriter<MemberEntity> csvFileItemWriter = new FlatFileItemWriterBuilder<MemberEntity>()
+            .name("CSV_FILE_IO_SAMPLE_JOB" + "___csvFileItemWriter")
+            .encoding("UTF-8")
+            .resource(new FileSystemResource("output/member-test-output.csv"))
+    //        .resource(new ClassPathResource("member-test-output.csv"))
+            .lineAggregator(lineAggregator)
+            .headerCallback(writer -> writer.write("id, 이름, 이메일"))
+            .footerCallback(writer -> writer.write("-------"))
+            .append(true)
+            .build();
+
+        csvFileItemWriter.afterPropertiesSet();
+
+        return csvFileItemWriter;
+  }
+}
+```
+
+
+
+
+
 ## ItemProcessor 작성
+
+### logging Processor
+
+```java
+@Slf4j
+@Configuration
+@RequiredArgsConstructor
+public class CsvFileReadWriteJobConfig {
+    
+    // ...
+    
+    private ItemProcessor<MemberEntity, MemberEntity> loggingProcessor(){
+        return memberEntity -> {
+          log.info("memberEntity = {}", memberEntity.getName());
+          return memberEntity;
+        };
+    }
+}
+```
+
+<br/>
+
+
+
+### MemberEntity Processor
 
 간단한 ItemProcessor 입니다.
 
@@ -175,20 +277,19 @@ public class CsvFileSampleJobConfig {
   // ...
     
   @Bean
-  public Job CsvFileSampleJob() throws Exception {
-    return this.jobBuilderFactory.get("CSV_FILE_IO_SAMPLE_JOB")
+  public Job csvFileSampleJob() throws Exception {
+    return this.jobBuilderFactory.get(jobName)
         .incrementer(new RunIdIncrementer())
-        .start(this.CsvFileSampleStep())
+        .start(this.csvFileSampleStep())
         .build();
   }
 
-  @Bean
-  @JobScope
-  public Step CsvFileSampleStep() throws Exception {
+  private Step csvFileSampleStep() throws Exception {
     return this.stepBuilderFactory.get("CSV_FILE_IO_SAMPLE_STEP")
         .<MemberEntity, MemberEntity>chunk(CHUNK_SIZE)
         .reader(csvFileItemReader())
-        .processor(itemProcessor())
+        .processor(loggingProcessor())
+        .processor(csvFileSampleJobProcessor())
         .writer(csvFileItemWriter())
         .build();
   }
@@ -202,22 +303,42 @@ public class CsvFileSampleJobConfig {
 
 
 
+## 출력결과
+
+프로젝트 루트로부터 생성된 `output/member-test-output.csv` 파일은 아래와 같이 생성됩니다.
+
+```csv
+id, 이름, 이메일
+1,aaaaaaaaaa,aaaaa@email.com
+2,bbbbbbbbbb,bbbbb@email.com
+3,cccccccccc,ccccc@email.com
+4,dddddddddd,ddddd@email.com
+5,eeeeeeeeee,eeeee@email.com
+6,ffffffffff,fffff@email.com
+7,gggggggggg,ggggg@email.com
+8,hhhhhhhhhh,hhhhh@email.com
+9,iiiiiiiiii,iiiii@email.com
+10,jjjjjjjjjj,jjjjj@email.com
+-------
+```
+
+<br/>
+
+
+
 ## 전체 코드
 
 ```java
-package com.example.batch_sample.member.batch;
+package com.example.batch_sample.member.batch.job;
 
-import com.example.batch_sample.global.reader.LinkedListItemReader;
 import com.example.batch_sample.member.entity.MemberEntity;
 import com.example.batch_sample.member.entity.factory.MemberEntityFactory;
-import com.example.batch_sample.member.fixtures.MemberEntityFixtures;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
-import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemProcessor;
@@ -233,38 +354,39 @@ import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
-public class CsvFileSampleJobConfig {
+public class CsvFileReadWriteJobConfig {
 
   private final JobBuilderFactory jobBuilderFactory;
   private final StepBuilderFactory stepBuilderFactory;
   private final MemberEntityFactory memberEntityFactory;
 
   private static final int CHUNK_SIZE = 5;
+  private static final String jobName = "CSV_FILE_IO_SAMPLE_JOB";
 
   @Bean
-  public Job CsvFileSampleJob() throws Exception {
-    return this.jobBuilderFactory.get("CSV_FILE_IO_SAMPLE_JOB")
+  public Job csvFileSampleJob() throws Exception {
+    return this.jobBuilderFactory.get(jobName)
         .incrementer(new RunIdIncrementer())
-        .start(this.CsvFileSampleStep())
+        .start(this.csvFileSampleStep())
         .build();
   }
 
-  @Bean
-  @JobScope
-  public Step CsvFileSampleStep() throws Exception {
+  private Step csvFileSampleStep() throws Exception {
     return this.stepBuilderFactory.get("CSV_FILE_IO_SAMPLE_STEP")
         .<MemberEntity, MemberEntity>chunk(CHUNK_SIZE)
         .reader(csvFileItemReader())
-        .processor(itemProcessor())
+        .processor(loggingProcessor())
+        .processor(csvFileSampleJobProcessor())
         .writer(csvFileItemWriter())
         .build();
   }
 
-  public FlatFileItemReader<MemberEntity> csvFileItemReader() throws Exception {
+  private FlatFileItemReader<MemberEntity> csvFileItemReader() throws Exception {
     // tokenizer
     DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
     tokenizer.setNames("id", "name", "email");
@@ -284,7 +406,7 @@ public class CsvFileSampleJobConfig {
 
     // FlatMapItemReader 정의
     FlatFileItemReader<MemberEntity> itemReader = new FlatFileItemReaderBuilder<MemberEntity>()
-        .name("CSV_FILE_ITEM_READER") // READER NAME 지정
+        .name("itemReader") // READER NAME 지정
         .encoding("UTF-8") // encoding 방식 지정
         .resource(new ClassPathResource("member-test-input.csv")) // Classpath 내의 test.csv 파일
         .linesToSkip(1) // 첫 1줄은 skip (제목)
@@ -296,7 +418,7 @@ public class CsvFileSampleJobConfig {
     return itemReader;
   }
 
-  public FlatFileItemWriter<MemberEntity> csvFileItemWriter() throws Exception {
+  private FlatFileItemWriter<MemberEntity> csvFileItemWriter() throws Exception {
     // fieldExtractor
     // MemberEntity 에 대응되는 POJO 타입에 대응되도록 필드명을 매핑하는 Extractor
     BeanWrapperFieldExtractor<MemberEntity> fieldExtractor = new BeanWrapperFieldExtractor<>();
@@ -311,12 +433,13 @@ public class CsvFileSampleJobConfig {
 
     // FlatFileItemWriter 객체를 FlatFileItemWriterBuilder 를 통해 생성
     FlatFileItemWriter<MemberEntity> csvFileItemWriter = new FlatFileItemWriterBuilder<MemberEntity>()
-        .name("CSV_FILE_ITEM_WRITER")
+        .name("csvFileItemWriter")
         .encoding("UTF-8")
-        .resource(new ClassPathResource("member-test-output.csv"))
+        .resource(new FileSystemResource("output/member-test-output.csv"))
         .lineAggregator(lineAggregator)
         .headerCallback(writer -> writer.write("id, 이름, 이메일"))
         .footerCallback(writer -> writer.write("-------"))
+        .append(true)
         .build();
 
     csvFileItemWriter.afterPropertiesSet();
@@ -324,7 +447,14 @@ public class CsvFileSampleJobConfig {
     return csvFileItemWriter;
   }
 
-  public ItemProcessor<MemberEntity, MemberEntity> itemProcessor(){
+  private ItemProcessor<MemberEntity, MemberEntity> loggingProcessor(){
+    return memberEntity -> {
+      log.info("memberEntity = {}", memberEntity.getName());
+      return memberEntity;
+    };
+  }
+
+  private ItemProcessor<MemberEntity, MemberEntity> csvFileSampleJobProcessor(){
     return memberEntity -> {
       String newName = memberEntity.getName() + memberEntity.getName();
 
