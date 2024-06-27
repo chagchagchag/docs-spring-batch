@@ -2,5 +2,8 @@
     "1-setting-hellobatch": "Setting + Hello,Spring Batch",
     "job-config-live-template-creation": "JobConfig Live Template 만들기",
     "2.1-architecture": "기본 구조",
-    "csv-read-write-example": "Csv Read, Write 예제"
+    "2.2-spring-batch-essential": "Spring Batch Essential",
+    "csv-read-write-example": "CSV 파일 읽기/쓰기 예제",
+    "3-cursor-item-reader-vs-paging-item-reader": "CursorItemReader, PagingItemReader",
+    "4-jdbc-batch-item-writer-vs-jpa-item-writer": "JdbcBatchItemWriter vs JpaItemWriter"
 }
