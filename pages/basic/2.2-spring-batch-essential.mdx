@@ -30,9 +30,11 @@ Chunk 기반 처리
 
 
 
-## Job, Step, Reader, Processor, Writer
+## (!!!정리예정) Job, Step, Reader, Processor, Writer
 
 > !!!정리 예정
+
+>  자세한 내용은 [Spring Batch Architecture](/basic/2.1-architecture) 에 정리해두었으며, 여기서는 간단하게 이해가 빠르도록 의미만을 요약합니다.
 
 <br/>
 
@@ -118,6 +120,8 @@ AbstractStreamItemReader 는 ItemStream interface, ItemReader interface 를 impl
 
 그리고 세부적으로는 JpaCursorItemReader, JdbcCursorItemReader 와 같은 하위 구현체들이 존재하며, 이 구현체들은 spring-batch 에서 Jpa, Jdbc 를 통한 Data read 연산을 효율적으로 할 수 있도록 하는 연산을 제공합니다.<br/>
 
+<br/>
+
 
 
 ## AbstractItemStreamItemWriter
@@ -127,6 +131,29 @@ AbstractStreamItemReader 는 ItemStream interface, ItemReader interface 를 impl
 > - 몇몇 클래스는 UML 에서 생략했습니다.
 
 ![](./img/2.2-spring-batch-essential/abstract-item-stream-item-writer.png)
+
+<br/>
+
+AbstractFileItemWriter : 주로 파일입출력 작업을 할 수 있도록 제공되는 클래스입니다.
+
+- FlatFileItemWriter 를 이용하면 csv 파일의 읽고 쓰기가 가능해집니다.
+
+- JsonFileITemWriter 를 이용하면 Json파일의 쓰기 작업이 가능해집니다.
+
+
+
+AvroItemWriter
+
+- 주키퍼를 이용한 데이터 교환작업을 할 때 타입을 다른 타입으로 변환할 때 Avro 라는 것을 사용합니다.
+- 주로 카프카 시스템에서 생산자와 소비자 사이의 데이터 타입을 맞춰야 하는 일이 많아지고, 타입 역시 세부적으로 복잡해질 경우 Avro 를 표준으로 사용하게 됩니다.
+
+<br/>
+
+
+
+JdbcBatchItemWriter, JpaItemWriter
+
+- JdbcBatchItemWriter, JpaItemWriter 는 Batch 를 이용해서 데이터를 읽고 쓸 때 사용하는 ItemWriter 들입니다.
 
 
 

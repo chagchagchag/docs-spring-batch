@@ -1,7 +1,7 @@
 {
     "1-setting-hellobatch": "Setting + Hello,Spring Batch",
     "job-config-live-template-creation": "JobConfig Live Template 만들기",
-    "2.1-architecture": "기본 구조",
+    "2.1-architecture": "Spring Batch Architecture",
     "2.2-spring-batch-essential": "Spring Batch Essential",
     "csv-read-write-example": "CSV 파일 읽기/쓰기 예제",
     "3-cursor-item-reader-vs-paging-item-reader": "CursorItemReader, PagingItemReader",
