@@ -1,0 +1,54 @@
+## CursorItemReader, PagingItemReader
+
+## Cursor vs Paging 
+
+Cursor 기반 조회
+
+- Cursor 기반 처리는 커넥션을 열어두고, Cursor 를 통해서 데이터를 한 포인트씩 옮기면서 처리하는 것을 의미합니다.
+- 장점
+  - Cursor 기반 처리는 커넥션을 자주 열지 않고, 한번 열어둔 커넥션 내에서 모든 데이터를 가져오기에 Connection 빈도가 낮아서 성능이 좋습니다.
+  - 반면 Connection 을 오랫동안 유지해야 한다는 점은 Database 입장에서는 부담이 될 수 있으며, 하나의 Connection 에서 처리를 수행하기에 Thread Safe 하지 않습니다.
+- 단점
+  - 모든 결과를 메모리에 할당하기 때문에 시스템 자원을 많이 소모한다는 단점이 있습니다.
+
+<br/>
+
+Paging 기반 조회
+
+- Paging 이란 mysql 의 limit, offset 과 같은 쿼리를 통해 데이터를  m 건 단위(`limit`)로 끊어올때   n 페이지(`offset`) 위치에서 `limit` 만큼 데이터를 읽어오는 방식을 의미합니다.
+- Database 에 자주 Connection 요청을 해야 해서 IO 로 인한 지연현상이 발생한다는 단점이 있지만, Connection 유지 시간이 짧아서 Database에 부하를 덜 주게 됩니다.
+- Connection 을 필요할 때마다 하기에 Thread Safe 합니다.
+- 결과를 페이징 단위로 가져오기에, Cursor 기반에 비해 더 적은 메모리를 사용한다는 장점이 있습니다.
+
+<br/>
+
+
+
+## JdbcCursorItemReader vs JdbcPagingItemReader
+
+
+
+|                       | JdbcCursorItemReader                 | JdbcPagingItemReader                                         |
+| --------------------- | ------------------------------------ | ------------------------------------------------------------ |
+| datasource            | JDBC Datasource                      | JDBC Datasource                                              |
+| beanMapper, rowMapper |                                      |                                                              |
+| SQL                   | 조회 쿼리 직접 작성                  | No (미지원)                                                  |
+| DSL                   | No (미지원)                          | selectClause, fromClause, whereClause, queryProvider 를 사용한 쿼리 작성 |
+| fetchSize             | cursor 를 이용해 fetch 할  fetchSize | JdbcTemplate.fetchSize                                       |
+| pageSize              | No (미지원)                          | paging 시 지정하는 page 크기 (offset/limit)                  |
+
+
+
+## JpaCursorItemReader vs Jdbc PagingItemReader
+
+
+
+|                      | JpaCursorItemReader                                          | JpaPagingItemReader                                          |
+| -------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| entityManagerFactory | JPA 코드 실행에 필요한 EntityManager 객체 생성을 위한 EntityManagerFactory | JPA 코드 실행에 필요한 EntityManager 객체 생성을 위한 EntityManagerFactory |
+| queryString          | SQL 조회 쿼리 직접 작성                                      | No (미지원)                                                  |
+| DSL                  | No (미지원)                                                  | selectClause, fromeClause, whereClause                       |
+| pageSize             | No (미지원)                                                  | paging 에 사용될 page 크기 (offset/limit)                    |
+
+
+
